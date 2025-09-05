@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Chat App</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #ece5dd;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    #app {
+      width: 400px;
+      max-width: 95%;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+    #header {
+      background: #075E54;
+      color: white;
+      padding: 10px;
+      text-align: center;
+    }
+    #chat-box {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      background: #e5ddd5;
+    }
+    .message {
+      max-width: 70%;
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 15px;
+      clear: both;
+      font-size: 14px;
+    }
+    .my-message {
+      background: #dcf8c6;
+      float: right;
+      text-align: right;
+    }
+    .other-message {
+      background: #fff;
+      float: left;
+      text-align: left;
+      border: 1px solid #ddd;
+    }
+    .msg-container {
+      display: flex;
+      align-items: flex-end;
+      margin-bottom: 8px;
+    }
+    .msg-container img {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+    }
+    .msg-container.me {
+      flex-direction: row-reverse;
+    }
+    #input-area {
+      display: flex;
+      border-top: 1px solid #ccc;
+    }
+    #message-input {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      outline: none;
+    }
+    #send-btn {
+      background: #25D366;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      color: white;
+      font-weight: bold;
+    }
+    #login-area {
+      padding: 10px;
+      text-align: center;
+      border-bottom: 1px solid #ccc;
+    }
+    #login-btn {
+      padding: 8px 16px;
+      background: #4285F4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="header">My Chat App</div>
+    <div id="login-area">
+      <button id="login-btn">Login with Google</button>
+      <p id="user-info"></p>
+      <input type="hidden" id="name">
+      <input type="hidden" id="photo">
+    </div>
+    <div id="chat-box"></div>
+    <div id="input-area">
+      <input id="message-input" type="text" placeholder="Type a message..." />
+      <button id="send-btn">Send</button>
+    </div>
+  </div>
+  <button id="clear-btn" style="background:#d32f2f;color:white;border:none;padding:6px 12px;margin:6px;cursor:pointer;border-radius:4px;">
+  Clear Chat
+</button>
+
+
+  <script>
+    document.getElementById("clear-btn").addEventListener("click", () => {
+  if (confirm("Are you sure you want to clear the chat for everyone?")) {
+    firebase.database().ref("messages").remove();
+    document.getElementById("chat-box").innerHTML = "";
+  }
+});
+
+    // 🔹 Replace with your Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyABNZQgmI3ipEpMuwxsXWoyTGyMHnmnxMs",
+  authDomain: "mychatapp-int.firebaseapp.com",
+  databaseURL: "https://mychatapp-int-default-rtdb.firebaseio.com",
+  projectId: "mychatapp-int",
+  storageBucket: "mychatapp-int.firebasestorage.app",
+  messagingSenderId: "36628387977",
+  appId: "1:36628387977:web:46ccf92b260193381f8e58"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    const auth = firebase.auth();
+    const db = firebase.database();
+    const messagesRef = db.ref("messages");
+
+    // 🔹 Google Login
+    document.getElementById("login-btn").addEventListener("click", () => {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider)
+        .then((result) => {
+          const user = result.user;
+          document.getElementById("user-info").textContent =
+            "Logged in as " + user.displayName;
+          document.getElementById("name").value = user.displayName;
+          document.getElementById("photo").value = user.photoURL;
+        })
+        .catch((error) => {
+          alert("Login error: " + error.message);
+          console.error(error);
+        });
+    });
+
+    // 🔹 Send message
+    document.getElementById("send-btn").addEventListener("click", () => {
+      const name = document.getElementById("name").value;
+      const photo = document.getElementById("photo").value;
+      const message = document.getElementById("message-input").value;
+
+      if (name && message) {
+        messagesRef.push({
+          name,
+          photo,
+          message,
+          timestamp: new Date().toLocaleTimeString()
+        });
+        document.getElementById("message-input").value = "";
+      }
+    });
+
+    // 🔹 Display messages
+    messagesRef.on("child_added", (snapshot) => {
+      const msg = snapshot.val();
+      const me = (msg.name === document.getElementById("name").value);
+
+      const div = document.createElement("div");
+      div.classList.add("msg-container");
+      if (me) div.classList.add("me");
+
+      const avatar = `<img src="${msg.photo || 'https://via.placeholder.com/40'}">`;
+
+      const bubbleClass = me ? "message my-message" : "message other-message";
+      const bubble = `
+        <div class="${bubbleClass}">
+          <b>${msg.name}</b><br>${msg.message}
+          <br><small style="color:gray">${msg.timestamp}</small>
+        </div>
+      `;
+
+      div.innerHTML = me ? bubble + avatar : avatar + bubble;
+
+      document.getElementById("chat-box").appendChild(div);
+      document.getElementById("chat-box").scrollTop =
+        document.getElementById("chat-box").scrollHeight;
+    });
+  </script>
+</body>
+</html>
