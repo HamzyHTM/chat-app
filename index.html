@@ -122,6 +122,7 @@
   <button id="clear-btn" style="background:#d32f2f;color:white;border:none;padding:6px 12px;margin:6px;cursor:pointer;border-radius:4px;">
   Clear Chat
 </button>
+  <div id="typing-indicator" style="font-style:italic; color:gray; padding:5px 10px; height:20px;"></div>
 
 
   <script>
@@ -207,6 +208,43 @@
       document.getElementById("chat-box").scrollTop =
         document.getElementById("chat-box").scrollHeight;
     });
+    const typingRef = db.ref("typing");
+
+// detect typing
+document.getElementById("message-input").addEventListener("input", () => {
+  const name = document.getElementById("name").value;
+  if (name) {
+    typingRef.child(name).set(true);
+    // stop typing after 2s of no input
+    setTimeout(() => {
+      typingRef.child(name).set(false);
+    }, 2000);
+  }
+});
+
+// when a message is sent, stop typing
+document.getElementById("send-btn").addEventListener("click", () => {
+  const name = document.getElementById("name").value;
+  if (name) {
+    typingRef.child(name).set(false);
+  }
+});
+    typingRef.on("value", (snapshot) => {
+  const typingUsers = snapshot.val() || {};
+  const myName = document.getElementById("name").value;
+  let indicator = "";
+
+  for (let user in typingUsers) {
+    if (typingUsers[user] && user !== myName) {
+      indicator = `🖊️ ${user} is typing...`;
+      break;
+    }
+  }
+
+  document.getElementById("typing-indicator").textContent = indicator;
+});
+
   </script>
 </body>
 </html>
+
